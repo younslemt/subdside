@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Moteur d’aides Bruxelles — Primes, Prêts, Subsides, Garanties</title>
+  <style>
+    :root{--bg:#f4f6f8;--text:#0b1c2d;--muted:#4f6477;--panel:#fff;--border:#dbe4ec;--navy:#001f3f;--blue:#eef5ff;--green:#28a745;--orange:#ff9f43;--purple:#6c5ce7;--teal:#00cec9}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{width:min(1160px,92vw);margin:24px auto}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px}
+    h1{margin:0 0 8px;color:var(--navy)} .sub{margin:0;color:var(--muted)}
+    .row{display:grid;grid-template-columns:1fr auto auto;gap:10px;margin-top:14px}
+    input{height:42px;border:1px solid var(--border);border-radius:10px;padding:0 12px}
+    button{height:42px;border-radius:10px;border:1px solid var(--navy);background:var(--navy);color:#fff;font-weight:600;cursor:pointer;padding:0 12px}
+    button.alt{background:#fff;color:var(--navy)}
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .chip{border:1px solid var(--border);background:#fff;color:var(--navy);border-radius:999px;padding:7px 11px;font-size:.84rem;cursor:pointer}
+    .chip.active{background:var(--blue);border-color:#b9d1ee}
+    .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .pill{font-size:.76rem;border:1px solid var(--border);border-radius:999px;padding:4px 8px;background:#fff}
+    .dot{display:inline-block;width:9px;height:9px;border-radius:999px;margin-right:6px}
+    .prime{background:var(--green)} .pret{background:var(--orange)} .subside{background:var(--purple)} .garantie{background:var(--teal)}
+    #resultsWrap{display:none;margin-top:14px}
+    #activeFilters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:10px}
+    .result{grid-column:span 12;background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px}
+    .result h3{margin:4px 0 8px;font-size:1rem;color:var(--navy)}
+    .meta{font-size:.9rem;color:var(--text);display:grid;gap:4px}
+    .tag{font-size:.75rem;padding:3px 8px;border:1px solid var(--border);border-radius:999px;display:inline-block;margin:4px 6px 0 0}
+    a{color:#003a70}
+    @media(min-width:900px){.result{grid-column:span 6}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>Moteur d’aides Bruxelles</h1>
+      <p class="sub">Sélectionne un ou plusieurs secteurs clés + type d’aide, puis clique <b>Afficher les résultats</b>.</p>
+
+      <div class="row">
+        <input id="q" placeholder="Mot-clé : ex. starter, utilitaire, chantier, garantie, proxi..." />
+        <button id="searchBtn">Afficher les résultats</button>
+        <button id="resetBtn" class="alt">Reset</button>
+      </div>
+
+      <h4>Secteurs clés</h4>
+      <div class="chips" id="sectorChips"></div>
+
+      <h4>Type d’aide</h4>
+      <div class="chips" id="typeChips"></div>
+
+      <div class="legend">
+        <span class="pill"><span class="dot prime"></span>Prime</span>
+        <span class="pill"><span class="dot pret"></span>Prêt</span>
+        <span class="pill"><span class="dot subside"></span>Subside</span>
+        <span class="pill"><span class="dot garantie"></span>Garantie</span>
+      </div>
+    </section>
+
+    <section id="resultsWrap" class="card">
+      <div id="activeFilters"></div>
+      <div id="count" style="color:#4f6477;margin-bottom:10px"></div>
+      <div id="results" class="grid"></div>
+    </section>
+  </main>
+
+  <script>
+    const sectors = [
+      'construction-renovation','transport-logistique','horeca','commerce-detail','industrie-production',
+      'tech-digital','sante-bien-etre','services-b2b','economie-circulaire','industries-creatives','transversal'
+    ];
+    const sectorLabel = {
+      'construction-renovation':'Construction & rénovation','transport-logistique':'Transport & logistique','horeca':'Horeca','commerce-detail':'Commerce de détail','industrie-production':'Industrie & production','tech-digital':'Tech / digital','sante-bien-etre':'Santé & bien-être','services-b2b':'Services B2B','economie-circulaire':'Économie circulaire','industries-creatives':'Industries créatives','transversal':'Transversal'
+    };
+
+    const types = ['prime','pret','subside','garantie'];
+    const typeLabel = {prime:'Prime',pret:'Prêt',subside:'Subside',garantie:'Garantie'};
+
+    const aids = [
+      {type:'prime', title:'Prime Utilitaire électrique', k:['transport-logistique','transversal'], amount:'max 16.000 €/véhicule ; max 48.000 €/an', cond:'5% à 40%', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-utilitaire-electrique'},
+      {type:'prime', title:'Prime Rétrofit utilitaire', k:['transport-logistique','transversal'], amount:'max 16.000 €/véhicule ; max 48.000 €/an', cond:'5% à 40% (+35% LEZ possible)', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-retrofit'},
+      {type:'prime', title:'Prime Vélo-cargo / remorque', k:['transport-logistique','commerce-detail','horeca','transversal'], amount:'4.000 €/vélo ; 2.000 €/remorque ; max 12.000 €/an', cond:'40% à 70%', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-velo-cargo'},
+      {type:'prime', title:'Prime Matériel ou Travaux', k:['construction-renovation','industrie-production','transversal'], amount:'plafond global 350.000 €/an (500.000 € en zone)', cond:'2,5% à 30%', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-materiel-travaux'},
+      {type:'prime', title:'Prime Immobilier', k:['construction-renovation','industrie-production'], amount:'intégrée au plafond investissements 350k/500k', cond:'2,5% à 20%', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-immobilier'},
+      {type:'prime', title:'Prime Conformité aux normes', k:['construction-renovation','horeca','commerce-detail','sante-bien-etre'], amount:'max 40.000 €/an', cond:'40%', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-conformite-normes'},
+      {type:'prime', title:'Prime Sécurisation', k:['construction-renovation','commerce-detail','horeca','sante-bien-etre'], amount:'max 10.000 €/an', cond:'40% (60% starter)', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-securisation'},
+      {type:'prime', title:'Prime Investissements transition', k:['construction-renovation','industrie-production','economie-circulaire','transversal'], amount:'max 50.000 €/an', cond:'30% à 50%', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-transition-investissements'},
+      {type:'pret', title:'Prêt RISE UP (Brusoc)', k:['transversal','construction-renovation','transport-logistique','services-b2b','commerce-detail','horeca','tech-digital'], amount:'jusqu’à 100.000 €', cond:'taux fixe 4% ; durée 2 à 5 ans', public:'Petites entreprises (personnes morales)', link:'https://finance.brussels/rise-up-pret-entreprise-bruxelles/'},
+      {type:'pret', title:'Prêt Proxi', k:['transversal'], amount:'entreprise jusqu’à 250.000 €', cond:'2,25% à 4,50% (2026)', public:'Indépendants/PME bruxellois', link:'https://finance.brussels/proxi/'},
+      {type:'pret', title:'Prêt subordonné', k:['transversal'], amount:'jusqu’à 50.000 € en complément Garantie Plus', cond:'taux selon risque', public:'Complément de financement', link:'https://finance.brussels/nos-solutions-de-financement-pret-subordonne/'},
+      {type:'garantie', title:'Garantie bancaire (FBG)', k:['transversal'], amount:'jusqu’à 1,5 M€ de garantie', cond:'65% amortissable / 50% non amortissable (jusqu’à 80% si exemplarité)', public:'PME/indépendants/ASBL éligibles', link:'https://finance.brussels/garanties/'},
+      {type:'garantie', title:'Garantie Plus', k:['transversal'], amount:'garantie + prêt subordonné jusqu’à 50.000 €', cond:'via banque partenaire', public:'Entreprises bruxelloises', link:'https://finance.brussels/garantie-plus/'},
+      {type:'subside', title:'Subsides RENOLUTION', k:['construction-renovation','transversal'], amount:'ex. isolation toiture 35-75 €/m² ; PAC 4.500-5.000 €', cond:'forfait ou % selon catégorie', public:'Bâtiments en RBC (>10 ans)', link:'https://renolution.brussels/fr/les-primes-renolution'},
+      {type:'subside', title:'Primes export (statut)', k:['transversal','services-b2b','industries-creatives','tech-digital'], amount:'nouvelles demandes suspendues (budget 2025)', cond:'N/A', public:'Entreprises bruxelloises', link:'https://economie-emploi.brussels/primes-export'},
+      {type:'prime', title:'Prime Digitalisation', k:['transversal','tech-digital','services-b2b','commerce-detail','horeca'], amount:'max 10.000 €/an', cond:'25% à 70%', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-digitalisation'},
+      {type:'prime', title:'Prime Formation', k:['transversal'], amount:'max 20.000 €/an', cond:'base 40% + majorations', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-formation'},
+      {type:'prime', title:'Prime Recrutement', k:['transversal','construction-renovation','transport-logistique','horeca','commerce-detail'], amount:'5.000 € à 15.000 €', cond:'forfait', public:'Micro-entreprises', link:'https://economie-emploi.brussels/prime-recrutement'},
+      {type:'prime', title:'Prime Accessibilité', k:['transversal','commerce-detail','horeca','sante-bien-etre'], amount:'max 80.000 €', cond:'50% à 70%', public:'PME bruxelloise', link:'https://economie-emploi.brussels/prime-transition-accessibilite'}
+    ];
+
+    const state = { selectedSectors:new Set(['transversal']), selectedTypes:new Set(types) };
+    const sectorChips = document.getElementById('sectorChips');
+    const typeChips = document.getElementById('typeChips');
+    const resultsWrap = document.getElementById('resultsWrap');
+    const results = document.getElementById('results');
+    const count = document.getElementById('count');
+    const activeFilters = document.getElementById('activeFilters');
+
+    function chip(label,key,set){
+      const b=document.createElement('button'); b.className='chip'; b.textContent=label;
+      if(set.has(key)) b.classList.add('active');
+      b.onclick=()=>{ if(set.has(key)) set.delete(key); else set.add(key); b.classList.toggle('active'); };
+      return b;
+    }
+    sectors.forEach(s=>sectorChips.appendChild(chip(sectorLabel[s],s,state.selectedSectors)));
+    types.forEach(t=>typeChips.appendChild(chip(typeLabel[t],t,state.selectedTypes)));
+
+    function render(){
+      const q=(document.getElementById('q').value||'').toLowerCase().trim();
+      const rows=aids.filter(a=>{
+        const sectorOK = state.selectedSectors.size===0 || a.k.some(k=>state.selectedSectors.has(k));
+        const typeOK = state.selectedTypes.size===0 || state.selectedTypes.has(a.type);
+        const txt = `${a.title} ${a.public} ${a.cond} ${a.amount} ${a.k.join(' ')}`.toLowerCase();
+        return sectorOK && typeOK && (!q || txt.includes(q));
+      });
+
+      activeFilters.innerHTML = [
+        ...[...state.selectedSectors].map(s=>`<span class='pill'>Secteur: ${sectorLabel[s]}</span>`),
+        ...[...state.selectedTypes].map(t=>`<span class='pill'>Type: ${typeLabel[t]}</span>`)
+      ].join('');
+
+      count.textContent = `${rows.length} résultat(s)`;
+      results.innerHTML = rows.length ? rows.map(r=>`
+        <article class='result'>
+          <span class='pill'><span class='dot ${r.type}'></span>${typeLabel[r.type]}</span>
+          <h3>${r.title}</h3>
+          <div class='meta'><div><b>Public:</b> ${r.public}</div><div><b>Conditions:</b> ${r.cond}</div><div><b>Montant:</b> ${r.amount}</div></div>
+          <div>${r.k.map(k=>`<span class='tag'>${sectorLabel[k]}</span>`).join('')}</div>
+          <div style='margin-top:8px'><a href='${r.link}' target='_blank' rel='noopener'>Source officielle</a></div>
+        </article>
+      `).join('') : `<article class='result'><b>Aucun résultat</b><div style='color:#4f6477'>Essaie d’activer plus de secteurs/types ou enlève un mot-clé.</div></article>`;
+      resultsWrap.style.display='block';
+    }
+
+    document.getElementById('searchBtn').onclick=render;
+    document.getElementById('resetBtn').onclick=()=>{
+      document.getElementById('q').value='';
+      state.selectedSectors = new Set(['transversal']);
+      state.selectedTypes = new Set(types);
+      [...document.querySelectorAll('#sectorChips .chip')].forEach((c,i)=>c.classList.toggle('active', sectors[i]==='transversal'));
+      [...document.querySelectorAll('#typeChips .chip')].forEach(c=>c.classList.add('active'));
+      resultsWrap.style.display='none';
+    };
+  </script>
+</body>
+</html>
